@@ -6,19 +6,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A two-file shim that makes Claude Code's **split-pane teammate mode** (`--teammate-mode tmux`) work inside the **kitty** terminal, which has no tmux. Claude Code shells out to a small subset of `tmux` commands to drive panes; this project intercepts those calls and translates them into kitty remote-control (`kitten @`) commands. There is no build system, no test suite, and no dependencies beyond Python 3 and kitty.
 
-- `claude-kitty` — bash launcher. Prepends the shim's `bin/` to `PATH`, sets teammate-mode env vars, fakes `$TMUX`/`$TMUX_PANE`, then `exec claude --teammate-mode tmux`.
+- `claude-kitty` — bash launcher. Prepends the shim's `bin/` to `PATH`, enables agent teams, then `exec claude --teammate-mode tmux`. It deliberately does **not** fake `$TMUX` (see "Notifications, clipboard & color" below).
 - `tmux` — the fake tmux (Python 3). Parses the tmux argv it receives and emits the equivalent `kitten @` calls.
 
 ## Critical: the repo files are a source copy, not the live shim
 
-The launcher and shim load from `~/.claude/kitty-tmux-shim/`, **not** from this repo:
+Both files run from installed copies, **not** from this repo. Editing a file here changes nothing until you copy it into place, then relaunch Claude Code.
 
-- `claude-kitty` execs the fake tmux at `~/.claude/kitty-tmux-shim/bin/tmux`.
-- This repo's `tmux` is a working copy. It is currently byte-identical to the installed one, but **editing `tmux` here changes nothing until you copy it into place**:
+- **Shim** (`tmux`) is installed at `~/.claude/kitty-tmux-shim/bin/tmux` (the launcher prepends that `bin/` to `PATH`):
   ```bash
   cp tmux ~/.claude/kitty-tmux-shim/bin/tmux && chmod +x ~/.claude/kitty-tmux-shim/bin/tmux
   ```
-  After any change to `tmux`, reinstall and relaunch Claude Code for it to take effect.
+- **Launcher** (`claude-kitty`) is installed on `PATH` at `~/bin/claude-kitty`:
+  ```bash
+  cp claude-kitty ~/bin/claude-kitty && chmod +x ~/bin/claude-kitty
+  ```
+
+Both installed copies are currently byte-identical to this repo. Keep them in sync after every edit.
 
 ## Running and debugging
 
@@ -36,6 +40,14 @@ allow_remote_control yes
 listen_on unix:/tmp/kitty
 enabled_layouts splits,stack      # 'splits' must be the active layout
 ```
+
+## Notifications, clipboard & color: why `$TMUX` must stay unset
+
+This is the subtle bit. Claude Code emits some things as raw terminal escape sequences written to its own stdout (the kitty window) rather than as `tmux` subcommands — notably **desktop notifications** (OSC 99 kitty / OSC 9 iTerm / OSC 777 ghostty), **clipboard** writes (OSC 52), truecolor, and capability probes. The shim never sees these — they don't go through the `tmux` binary.
+
+When Claude Code believes it is inside tmux (i.e. `$TMUX` is set), it wraps every one of those escapes in **tmux DCS passthrough** (`\ePtmux;…\e\\`). **kitty does not parse tmux passthrough, so it silently drops them** — no "Claude needs your input" notification ever fires, clipboard copies vanish, and color is downgraded to 256. The `tmux` shim *cannot* fix this, because the escapes never reach it.
+
+Therefore the launcher must **not** fake `$TMUX`. The previous version exported a fake `$TMUX`/`$TMUX_PANE`; that was the cause of missing notifications and is now gated behind `KITTY_TMUX_SHIM_FAKE_TMUX=1` (off by default). Teammate split-pane mode keeps working because it is selected by the `--teammate-mode tmux` flag (Claude Code's `TmuxBackend`), **not** by `$TMUX` — so unsetting `$TMUX` costs nothing and lets kitty receive notifications, clipboard, and truecolor natively. If you ever reintroduce a `$TMUX` export "to make detection work", you will silently break notifications again.
 
 ## How the shim is structured
 
