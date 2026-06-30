@@ -130,6 +130,11 @@ def resolve_launch(cmd):
                 continue
             rest.append(cmd[i])
             i += 1
+        # Resume the last conversation for this directory instead of starting
+        # fresh. (If that cwd has no prior conversation, claude exits and the
+        # pane closes -- harmless for tabs that were actually running claude.)
+        if not ({"--continue", "-c"} & set(rest)):
+            rest.append("--continue")
         return [CLAUDE_KITTY] + rest
     if not os.path.isabs(cmd[0]):
         found = shutil.which(cmd[0], path=RESOLVE_PATH)

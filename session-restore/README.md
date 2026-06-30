@@ -35,11 +35,13 @@ kitty runs session `launch` commands with its own minimal GUI PATH
 (`/usr/bin:/bin:/usr/sbin:/sbin`), not your interactive shell's PATH, so the
 snapshot makes relaunched programs work anyway:
 
-* **claude teammate sessions** are routed through `~/bin/claude-kitty` (by
-  absolute path) instead of bare `claude` — otherwise they come back without the
-  tmux shim on PATH or `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`, i.e. teammate mode
-  broken (and bare `claude` isn't even on kitty's PATH). `claude-kitty` itself
-  prepends `~/.local/bin` so its `exec claude` resolves under that minimal PATH.
+* **claude teammate sessions** are routed through `~/bin/claude-kitty
+  --continue` (by absolute path) instead of bare `claude` — otherwise they come
+  back without the tmux shim on PATH or `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`,
+  i.e. teammate mode broken (and bare `claude` isn't even on kitty's PATH).
+  `--continue` resumes that directory's last conversation rather than starting
+  fresh. `claude-kitty` itself prepends `~/.local/bin` so its `exec claude`
+  resolves under that minimal PATH.
 * **other programs** are resolved to an absolute path against a realistic PATH
   (`~/.local/bin`, `~/bin`, Homebrew, ...) so e.g. `nvim` relaunches correctly.
 
@@ -72,12 +74,12 @@ is stdlib-only). The `kitten` binary defaults to
 
 - **~60s granularity** — layout changes in the last minute before a crash can be
   lost. Press `ctrl+shift+s` for an exact checkpoint before quitting.
-- **Programs restart fresh** — no scrollback or process state; a pane mid-task
-  re-runs its command (every kitty start will, e.g., spawn the `claude` sessions
-  again). To restore certain programs (`ssh`, dev servers, even `claude`) as a
-  plain shell in the right cwd instead, add their basenames to the `SHELLS` set
-  in `save-session.py`, or drop program-relaunch entirely by removing the
-  `-- <cmd>` emission in `render()`.
+- **Programs restart fresh** — no scrollback or live process state; a pane
+  mid-task re-runs its command. (claude is the exception: it relaunches with
+  `--continue`, resuming that directory's last conversation.) To restore certain
+  programs (`ssh`, dev servers, even `claude`) as a plain shell in the right cwd
+  instead, add their basenames to the `SHELLS` set in `save-session.py`, or drop
+  program-relaunch entirely by removing the `-- <cmd>` emission in `render()`.
 - **Split sizes are approximate**; focus is best-effort per tab (kitty session
   files can't encode exact split geometry).
 
