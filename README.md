@@ -4,6 +4,18 @@ Small extensions for the [kitty](https://sw.kovidgoyal.net/kitty/) terminal,
 aimed at running [Claude Code](https://claude.com/claude-code) comfortably inside
 kitty on macOS.
 
+## Quick install
+
+```bash
+git clone https://github.com/jLAM-ERR/kitty-extensions.git
+cd kitty-extensions
+./install.sh
+```
+
+`install.sh` is idempotent and installs both components (the shim + launcher on
+any OS; session restore on macOS), backing up `kitty.conf` before editing it.
+Then restart kitty and run `claude-kitty`. Per-component manual steps are below.
+
 ## Contents
 
 ### 1. Claude Code split-pane teammates on kitty — `claude-kitty` + `tmux`
