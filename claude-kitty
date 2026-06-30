@@ -8,8 +8,13 @@ set -euo pipefail
 
 SHIM_DIR="$HOME/.claude/kitty-tmux-shim"
 
-# 1) Put only our fake tmux first on PATH.
-export PATH="$SHIM_DIR/bin:$PATH"
+# 1) Put only our fake tmux first on PATH, and make sure `claude` itself is
+#    resolvable. When this launcher is started from an interactive shell, PATH
+#    already has ~/.local/bin; but when it is started by kitty session restore
+#    (startup_session) the inherited PATH is the minimal GUI one
+#    (/usr/bin:/bin:/usr/sbin:/sbin), so the `exec claude` below would fail with
+#    "command not found". Prepending ~/.local/bin keeps it self-sufficient.
+export PATH="$SHIM_DIR/bin:$HOME/.local/bin:$PATH"
 
 # 2) Agent teams are experimental and off by default.
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1

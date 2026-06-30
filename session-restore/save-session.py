@@ -25,6 +25,7 @@ import json
 import os
 import shlex
 import subprocess
+import shutil
 import sys
 import tempfile
 
@@ -36,6 +37,23 @@ HOME = os.path.expanduser("~")
 # Foreground processes whose basename is one of these are treated as "just a
 # shell" -> restored as a plain shell in the right cwd, not re-run as a command.
 SHELLS = {"bash", "zsh", "fish", "sh", "tcsh", "csh", "ksh", "dash", "nu", "xonsh"}
+
+# claude teammate sessions must be relaunched through this wrapper (it sets up
+# the kitty<-tmux shim on PATH and the agent-teams env); a direct `claude` would
+# come back with teammate mode broken. Absolute, because kitty's session-restore
+# PATH is the minimal GUI one.
+CLAUDE_KITTY = os.path.expanduser("~/bin/claude-kitty")
+
+# kitty runs session `launch` commands with its own minimal PATH
+# (/usr/bin:/bin:/usr/sbin:/sbin), so a bare argv[0] like `claude` or `nvim`
+# won't resolve. Resolve programs to absolute paths against a realistic PATH.
+RESOLVE_PATH = os.pathsep.join([
+    os.path.join(HOME, ".local", "bin"),
+    os.path.join(HOME, "bin"),
+    "/opt/homebrew/bin", "/opt/homebrew/sbin",
+    "/usr/local/bin",
+    os.environ.get("PATH", "/usr/bin:/bin:/usr/sbin:/sbin"),
+])
 
 
 def sockets():
@@ -93,6 +111,33 @@ def primary_process(win):
     return cmd, cwd
 
 
+def resolve_launch(cmd):
+    """Turn a captured cmdline into one that actually runs under kitty's minimal
+    session-restore PATH: route claude teammate sessions through claude-kitty,
+    and make every other program absolute."""
+    if not cmd:
+        return cmd
+    base = os.path.basename(cmd[0])
+    if base == "claude" and "--teammate-mode" in cmd and os.path.exists(CLAUDE_KITTY):
+        # claude-kitty re-injects `--teammate-mode tmux`; pass only the extras.
+        rest, i = [], 1
+        while i < len(cmd):
+            if cmd[i] == "--teammate-mode":
+                i += 2
+                continue
+            if cmd[i].startswith("--teammate-mode="):
+                i += 1
+                continue
+            rest.append(cmd[i])
+            i += 1
+        return [CLAUDE_KITTY] + rest
+    if not os.path.isabs(cmd[0]):
+        found = shutil.which(cmd[0], path=RESOLVE_PATH)
+        if found:
+            return [found] + cmd[1:]
+    return cmd
+
+
 def render(os_windows):
     out = []
     for oi, osw in enumerate(os_windows):
@@ -109,6 +154,7 @@ def render(os_windows):
             focus_after = None
             for wi, w in enumerate(wins):
                 cmd, cwd = primary_process(w)
+                cmd = resolve_launch(cmd)
                 parts = ["launch", "--cwd", shlex.quote(cwd)]
                 if cmd:
                     parts.append("--")
