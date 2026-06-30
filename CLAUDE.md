@@ -9,6 +9,8 @@ A two-file shim that makes Claude Code's **split-pane teammate mode** (`--teamma
 - `claude-kitty` — bash launcher. Prepends the shim's `bin/` to `PATH`, enables agent teams, then `exec claude --teammate-mode tmux`. It deliberately does **not** fake `$TMUX` (see "Notifications, clipboard & color" below).
 - `tmux` — the fake tmux (Python 3). Parses the tmux argv it receives and emits the equivalent `kitten @` calls.
 
+A separate, self-contained concern lives in **`session-restore/`** — a snapshot script + macOS LaunchAgent that make kitty reopen the previous tabs/splits on launch. It is unrelated to the tmux shim (it only reuses `allow_remote_control`); see `session-restore/README.md`. Like the shim, those files are source copies that install elsewhere (`~/.config/kitty/`, `~/Library/LaunchAgents/`).
+
 ## Critical: the repo files are a source copy, not the live shim
 
 Both files run from installed copies, **not** from this repo. Editing a file here changes nothing until you copy it into place, then relaunch Claude Code.
