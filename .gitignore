@@ -1,1 +1,4 @@
 .DS_Store
+
+# Local machine Claude Code config — not for a shared/public repo.
+.claude/settings.local.json
