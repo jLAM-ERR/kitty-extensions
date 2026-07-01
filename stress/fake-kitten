@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Fake `kitten @` used by the kitty-tmux-shim split-pane stress test.
+# The shim invokes us as:  fake-kitten @ [--to X] <subcommand> ...
+# We never touch a real kitty, so no panes ever open.
+#
+# Two subcommands must produce output; every other rc subcommand
+# (focus-window, set-window-title, send-text, close-window, ...) succeeds silently:
+#
+#   launch    -> a fresh, monotonic window id (like real kitty's `launch -P`),
+#               which kitty_launch_split() parses and rejects unless .isdigit().
+#   get-text  -> a line containing a shell-prompt glyph, so the shim's
+#               wait_for_prompt() (added when panes moved to a /bin/sh placeholder)
+#               returns immediately instead of polling the full 8s timeout per
+#               respawn-pane. Real /bin/sh shows `sh-3.2$`.
+sub="$2"
+[ "$sub" = "--to" ] && sub="$4"   # tolerate an injected `--to <socket>`
+case "$sub" in
+    launch)
+        c="${KITTY_FAKE_STATE:-/tmp}/fake-kitten.counter"
+        v="$(cat "$c" 2>/dev/null)"
+        case "$v" in ''|*[!0-9]*) v=100 ;; esac   # empty/garbage read -> reset base
+        n=$((v + 1))
+        printf '%s\n' "$n" > "$c"
+        printf '%s\n' "$n"
+        ;;
+    get-text)
+        printf 'sh-3.2$ \n'
+        ;;
+esac
+exit 0

@@ -1,0 +1,5 @@
+# Local artifacts produced by a stress run (isolated, disposable).
+sandbox*/
+*.counter
+stress-summary.txt
+stress-*.out
