@@ -149,11 +149,15 @@ def render(os_windows):
         if oi > 0:
             out.append("new_os_window")
         for ti, tab in enumerate(osw.get("tabs") or []):
-            if ti > 0:
-                out.append("new_tab")
             title = (tab.get("title") or "").strip().replace("\n", " ")
-            if title:
-                out.append("tab_title " + title)
+            # The tab title is the argument to `new_tab` (kitty stores it as the
+            # sticky Tab.name). A leading `new_tab` does NOT create a spurious
+            # empty tab -- verified for both the first tab and the first tab after
+            # `new_os_window` -- so emit it for every tab including the first.
+            # Do NOT use `tab_title` (not a valid session command -> parse_session
+            # raises and kitty fails to start at all, no window) nor a separate
+            # `title` line (that only sets the next window's transient title).
+            out.append("new_tab " + title if title else "new_tab")
             out.append("layout " + (tab.get("layout") or "splits"))
             wins = tab.get("windows") or []
             focus_after = None
