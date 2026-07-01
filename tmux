@@ -245,7 +245,22 @@ def kitty_launch_split(location, cwd=None, cmd_tokens=None):
     if not wid.isdigit():
         log(f"  launch: unexpected output {out!r}")
         return ""
+    apply_pane_spacing(wid)
     return wid
+
+
+# Margin/padding applied to each teammate pane the shim creates (never the lead)
+# so the swarm panes read as visually distinct. Tunable via env: e.g.
+# KITTY_TMUX_SHIM_PANE_SPACING="margin=8 padding=6" or "margin-h=10", and
+# "none" / "" disables it. Values are kitty set-spacing tokens (pts).
+DEFAULT_PANE_SPACING = "margin=4"
+
+
+def apply_pane_spacing(wid):
+    spec = os.environ.get("KITTY_TMUX_SHIM_PANE_SPACING", DEFAULT_PANE_SPACING).strip()
+    if not spec or spec.lower() == "none":
+        return
+    kitty_rc(["set-spacing", "--match", "id:" + wid] + spec.split())
 
 
 def record_pane(wid, sess=None):
@@ -478,6 +493,12 @@ def cmd_kill_session(args):
 
 
 def cmd_select(args):
+    """tmux select-pane. CC issues this per teammate mainly to set the pane
+    title (`-T`) and border during swarm setup. We deliberately do NOT
+    focus-window here: focusing a teammate pane yanks kitty to the lead's tab
+    (and raises the OS window), stealing the user's focus from wherever they are
+    while agents spawn in the background. Every real shim op targets an explicit
+    id, so the active-pane never matters -- only the title does."""
     target = None
     title = None
     i = 0
@@ -492,10 +513,8 @@ def cmd_select(args):
         else:
             i += 1
     wid = resolve_id(target)
-    if wid:
-        kitty_rc(["focus-window", "--match", "id:" + wid])
-        if title:
-            kitty_rc(["set-window-title", "--match", "id:" + wid, title])
+    if wid and title:
+        kitty_rc(["set-window-title", "--match", "id:" + wid, title])
 
 
 def wait_for_prompt(wid, timeout=8.0):
