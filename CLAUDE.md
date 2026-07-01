@@ -82,7 +82,7 @@ When `$TMUX` is unset, CC's `TmuxBackend` drives a detached tmux session it neve
 
 **Pane placement & focus.** `kitty_launch_split` pins every split to the lead session's tab with `--match window_id:$KITTY_WINDOW_ID`. Without it, `launch` splits whatever kitty window is *currently active*, so teammates land in whichever tab the user is looking at rather than the lead's tab. Two things keep the spawn from stealing focus while agents appear in the background: `launch --keep-focus` (the new pane doesn't grab focus) **and** `cmd_select` not calling `focus-window` — CC issues `select-pane -t %id -T <name>` per teammate, and focusing those panes would yank kitty to the lead's tab (and raise the OS window). The shim only sets the title from `-T`.
 
-**Pane spacing.** After creating a teammate pane, `apply_pane_spacing()` gives it a margin via `kitten @ set-spacing` (default `margin=4`) so the swarm panes read as distinct; the lead is never touched. Tunable with `KITTY_TMUX_SHIM_PANE_SPACING` (e.g. `"margin=8 padding=6"`, `"margin-h=10"`); `none` or empty disables it.
+**Pane spacing.** `apply_pane_spacing()` can give each teammate pane a margin/padding via `kitten @ set-spacing` (scoped by `--match id:`, so the lead and other windows are never touched). It's **off by default** (`DEFAULT_PANE_SPACING = "none"`) to respect whatever the user set in kitty.conf — `set-spacing` writes absolute values and would otherwise override their configured margin on these panes. Opt in with `KITTY_TMUX_SHIM_PANE_SPACING` (e.g. `"margin=8 padding=6"`, `"margin-h=10"`); the override is per-window and not persisted (`--configured` is not passed).
 
 ## How the shim is structured
 

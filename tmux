@@ -249,11 +249,12 @@ def kitty_launch_split(location, cwd=None, cmd_tokens=None):
     return wid
 
 
-# Margin/padding applied to each teammate pane the shim creates (never the lead)
-# so the swarm panes read as visually distinct. Tunable via env: e.g.
-# KITTY_TMUX_SHIM_PANE_SPACING="margin=8 padding=6" or "margin-h=10", and
-# "none" / "" disables it. Values are kitty set-spacing tokens (pts).
-DEFAULT_PANE_SPACING = "margin=4"
+# Optional margin/padding for each teammate pane the shim creates (never the
+# lead). OFF by default so we respect whatever spacing the user configured in
+# kitty.conf -- `set-spacing` would otherwise override their margin on these
+# panes. Opt in via env, e.g. KITTY_TMUX_SHIM_PANE_SPACING="margin=8 padding=6"
+# or "margin-h=10". Values are kitty set-spacing tokens (pts); "none"/"" is off.
+DEFAULT_PANE_SPACING = "none"
 
 
 def apply_pane_spacing(wid):
