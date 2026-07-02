@@ -4,41 +4,46 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A two-file shim that makes Claude Code's **split-pane teammate mode** (`--teammate-mode tmux`) work inside the **kitty** terminal, which has no tmux. Claude Code shells out to a small subset of `tmux` commands to drive panes; this project intercepts those calls and translates them into kitty remote-control (`kitten @`) commands. There is no build system, no test suite, and no dependencies beyond Python 3 and kitty.
+This repo (`kitty-extensions`) bundles **two independent kitty extensions**, each self-contained under its own directory and separately installable. There is no build system and no dependencies beyond Python 3 and kitty.
 
-- `claude-kitty` — bash launcher. Prepends the shim's `bin/` to `PATH`, enables agent teams, then `exec claude --teammate-mode tmux`. It deliberately does **not** fake `$TMUX` (see "Notifications, clipboard & color" below).
-- `tmux` — the fake tmux (Python 3). Parses the tmux argv it receives and emits the equivalent `kitten @` calls.
+**1. `tmux-shim/` — Claude Code split-pane teammates.** Makes Claude Code's **split-pane teammate mode** (`--teammate-mode tmux`) work inside the **kitty** terminal, which has no tmux. Claude Code shells out to a small subset of `tmux` commands to drive panes; the shim intercepts those calls and translates them into kitty remote-control (`kitten @`) commands.
 
-A separate, self-contained concern lives in **`session-restore/`** — a snapshot script + macOS LaunchAgent that make kitty reopen the previous tabs/splits on launch. It is unrelated to the tmux shim (it only reuses `allow_remote_control`); see `session-restore/README.md`. Like the shim, those files install elsewhere (`~/.config/kitty/`, `~/Library/LaunchAgents/`) — `save-session.py` via a symlink back to this repo, the LaunchAgent plist as a real copy (launchd can be picky about symlinked plists, and it embeds an absolute path to the script anyway).
+- `tmux-shim/claude-kitty` — bash launcher. Prepends the shim's `bin/` to `PATH`, enables agent teams, then `exec claude --teammate-mode tmux`. It deliberately does **not** fake `$TMUX` (see "Notifications, clipboard & color" below).
+- `tmux-shim/tmux` — the fake tmux (Python 3). Parses the tmux argv it receives and emits the equivalent `kitten @` calls.
+- `tmux-shim/stress/` — a self-contained load/regression harness for the shim (see its README).
+
+**2. `session-restore/` — reopen previous tabs/splits on launch.** A snapshot script + macOS LaunchAgent. Unrelated to the shim (it only reuses `allow_remote_control`); see `session-restore/README.md`. Those files install elsewhere (`~/.config/kitty/`, `~/Library/LaunchAgents/`) — `save-session.py` via a symlink back to this repo, the LaunchAgent plist as a real copy (launchd can be picky about symlinked plists, and it embeds an absolute path to the script anyway).
+
+Each module has its own idempotent `install.sh` (managing only its own kitty.conf block); the top-level `install.sh` is a chooser that runs one or both (`./install.sh [tmux-shim|session-restore|all]`).
 
 ## The repo is the live install (via symlinks)
 
 On this machine the installed paths are **symlinks back to this repo**, so editing a file here is immediately live — there is no copy step and the installed copy can never drift from the repo. Two nuances about when an edit takes effect:
 
 - The **`tmux` shim** is re-executed on every call CC makes, so shim edits apply to the next pane operation without relaunching.
-- **`claude-kitty`** is read once at launch, so launcher edits apply to the next `./claude-kitty` you start (a running session keeps the old one).
+- **`claude-kitty`** is read once at launch, so launcher edits apply to the next `./tmux-shim/claude-kitty` you start (a running session keeps the old one).
 
 The symlinks (installed path → repo file):
 
-- **Shim** (`tmux`) → `~/.claude/kitty-tmux-shim/bin/tmux` (the launcher prepends that `bin/` to `PATH`)
-- **Launcher** (`claude-kitty`) → `~/bin/claude-kitty` (on `PATH`)
+- **Shim** (`tmux-shim/tmux`) → `~/.claude/kitty-tmux-shim/bin/tmux` (the launcher prepends that `bin/` to `PATH`)
+- **Launcher** (`tmux-shim/claude-kitty`) → `~/bin/claude-kitty` (on `PATH`)
 - **Snapshot** (`session-restore/save-session.py`) → `~/.config/kitty/save-session.py`
 
 Recreate a link if one is ever missing (run from the repo root; absolute target, `-n` so an existing link isn't dereferenced):
 
 ```bash
-ln -sfn "$PWD/tmux"                            ~/.claude/kitty-tmux-shim/bin/tmux
-ln -sfn "$PWD/claude-kitty"                    ~/bin/claude-kitty
-ln -sfn "$PWD/session-restore/save-session.py" ~/.config/kitty/save-session.py
+ln -sfn "$PWD/tmux-shim/tmux"                   ~/.claude/kitty-tmux-shim/bin/tmux
+ln -sfn "$PWD/tmux-shim/claude-kitty"           ~/bin/claude-kitty
+ln -sfn "$PWD/session-restore/save-session.py"  ~/.config/kitty/save-session.py
 ```
 
-The repo scripts must stay executable (`chmod +x tmux claude-kitty`) — a symlink inherits its target's mode, so a non-executable target makes the shim/launcher unrunnable. **`install.sh` (the public one-shot installer) deliberately still *copies*** rather than links, so end-users who delete their clone keep a working install; symlinks are a maintainer-only convenience for live editing.
+The repo scripts must stay executable (`chmod +x tmux-shim/tmux tmux-shim/claude-kitty`) — a symlink inherits its target's mode, so a non-executable target makes the shim/launcher unrunnable. **The `install.sh` scripts (public one-shot installers) deliberately still *copy*** rather than link, so end-users who delete their clone keep a working install; symlinks are a maintainer-only convenience for live editing.
 
 ## Running and debugging
 
 ```bash
-./claude-kitty [any claude args...]          # launch CC with the shim active for this process only
-tail -f ~/.claude/kitty-tmux-shim/shim.log   # watch every tmux invocation CC makes
+./tmux-shim/claude-kitty [any claude args...] # launch CC with the shim active for this process only
+tail -f ~/.claude/kitty-tmux-shim/shim.log    # watch every tmux invocation CC makes
 grep -E 'UNHANDLED|EXC' ~/.claude/kitty-tmux-shim/shim.log   # find gaps to fix
 ```
 
@@ -110,7 +115,7 @@ When Claude Code drives a pane in a way the shim doesn't yet support, it shows u
    - **Safe to ignore** (CC issues it but nothing needs to happen) → add the subcommand to the **`NOOP`** set so it returns 0 quietly. Anything that must return success for CC to proceed belongs in a handler or NOOP, never left to fall through. (`has-session` is the one command that must return an honest 0/1 — see the invariants above.)
 3. **Follow the parsing convention.** In a new handler, walk `args` manually consuming each flag and, where applicable, its value — mirror the existing `cmd_*` functions. `split_global()` has already stripped tmux's global options before your handler runs.
 4. **Keep the invariants** from the section above: never exit non-zero, log via `log(...)`, resolve pane targets through `resolve_id()`.
-5. **Verify.** The installed `tmux` is a symlink to this repo, so your edit is already live — no reinstall. Relaunch `./claude-kitty` (or just trigger the next pane op), reproduce the action, and confirm the `UNHANDLED` line is gone from the log.
+5. **Verify.** The installed `tmux` is a symlink to this repo, so your edit is already live — no reinstall. Relaunch `./tmux-shim/claude-kitty` (or just trigger the next pane op), reproduce the action, and confirm the `UNHANDLED` line is gone from the log.
 
 ## Conventions
 

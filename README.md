@@ -1,74 +1,45 @@
 # kitty-extensions
 
-Small extensions for the [kitty](https://sw.kovidgoyal.net/kitty/) terminal,
-aimed at running [Claude Code](https://claude.com/claude-code) comfortably inside
-kitty on macOS.
+Two small, **independent** extensions for the [kitty](https://sw.kovidgoyal.net/kitty/)
+terminal, aimed at running [Claude Code](https://claude.com/claude-code)
+comfortably inside kitty. Each lives in its own directory and installs on its own.
 
-## Quick install
+| Module | What it does | Platform |
+|--------|--------------|----------|
+| [`tmux-shim/`](tmux-shim/) | Run Claude Code's split-pane teammate mode in kitty (no tmux) — teammates open as real kitty splits | any OS with kitty + python3 |
+| [`session-restore/`](session-restore/) | Reopen the previous tabs / splits (each pane's cwd + program) on launch | macOS (LaunchAgent) |
+
+## Install
 
 ```bash
 git clone https://github.com/jLAM-ERR/kitty-extensions.git
 cd kitty-extensions
-./install.sh
+./install.sh                 # choose interactively (installs both if non-interactive)
+./install.sh tmux-shim       # just the shim + launcher
+./install.sh session-restore # just session restore
+./install.sh all             # both, non-interactively
 ```
 
-`install.sh` is idempotent and installs both components (the shim + launcher on
-any OS; session restore on macOS), backing up `kitty.conf` before editing it.
-Then restart kitty and run `claude-kitty`. Per-component manual steps are below.
+Each module also has its own installer (`tmux-shim/install.sh`,
+`session-restore/install.sh`) if you prefer to run them directly. All installers
+are idempotent, back up `kitty.conf` before editing, and manage only their own
+settings block within it. Restart kitty afterwards.
 
-## Contents
+## Modules
 
-### 1. Claude Code split-pane teammates on kitty — `claude-kitty` + `tmux`
+### [`tmux-shim/`](tmux-shim/) — Claude Code split-pane teammates
 
-Claude Code's split-pane teammate mode (`--teammate-mode tmux`) drives panes by
-shelling out to a small subset of `tmux` commands. kitty has no tmux, so this
-bridges the gap:
+Claude Code's teammate mode (`--teammate-mode tmux`) drives panes via a subset of
+`tmux` commands; kitty has no tmux, so a tiny "fake tmux" (Python 3, stdlib only)
+translates them into kitty remote-control (`kitten @`) calls. Run `claude-kitty`
+instead of `claude` and teammates open as real kitty splits. See
+[tmux-shim/README.md](tmux-shim/README.md) and [CLAUDE.md](CLAUDE.md).
 
-- **`tmux`** — a tiny "fake tmux" (Python 3, stdlib only) that translates the
-  tmux commands Claude Code issues (`split-window`, `send-keys`, `capture-pane`,
-  …) into kitty remote-control (`kitten @`) calls. Unknown commands are logged,
-  never fatal.
-- **`claude-kitty`** — a launcher that puts the shim first on `PATH` for that one
-  process and starts `claude --teammate-mode tmux`.
+### [`session-restore/`](session-restore/) — reopen tabs/splits on launch
 
-The result: Claude Code teammates open as real kitty splits.
-
-**Requirements** — in `kitty.conf`:
-
-```conf
-allow_remote_control yes
-listen_on unix:/tmp/mykitty-{kitty_pid}
-enabled_layouts splits,stack      # 'splits' must be the active layout
-```
-
-**Install:**
-
-```bash
-mkdir -p ~/.claude/kitty-tmux-shim/bin
-cp tmux ~/.claude/kitty-tmux-shim/bin/tmux && chmod +x ~/.claude/kitty-tmux-shim/bin/tmux
-cp claude-kitty ~/bin/claude-kitty       && chmod +x ~/bin/claude-kitty   # ~/bin = any dir on PATH
-```
-
-**Use:** run `claude-kitty` (with any `claude` args) instead of `claude`.
-
-Every translated call is logged to `~/.claude/kitty-tmux-shim/shim.log`; grep for
-`UNHANDLED` to find anything not yet covered. See [CLAUDE.md](CLAUDE.md) for the
-architecture and how to extend command coverage.
-
-> **Note:** the launcher intentionally does **not** fake `$TMUX`. If it did,
-> Claude Code would wrap its terminal escapes — desktop notifications (OSC
-> 99/9/777), clipboard (OSC 52), truecolor — in tmux DCS passthrough, which kitty
-> cannot parse, so notifications would silently vanish.
-
-### 2. Session restore — `session-restore/`
-
-Make kitty reopen the previous tabs / windows / splits on launch — each pane's
-working directory and foreground program — after a quit, crash, or reboot. A
-snapshot script captures the live layout (via `kitten @ ls`) every 60 seconds
-through a LaunchAgent, and `startup_session` replays it. macOS-specific.
-
-See [session-restore/README.md](session-restore/README.md) for install and
-details.
+A snapshot script captures the live layout (`kitten @ ls`) every 60s via a
+LaunchAgent; kitty's `startup_session` replays it after a quit, crash, or reboot.
+macOS-specific. See [session-restore/README.md](session-restore/README.md).
 
 ## License
 
