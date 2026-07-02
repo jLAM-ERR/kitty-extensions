@@ -16,6 +16,20 @@ SHIM_DIR="$HOME/.claude/kitty-tmux-shim"
 #    "command not found". Prepending ~/.local/bin keeps it self-sufficient.
 export PATH="$SHIM_DIR/bin:$HOME/.local/bin:$PATH"
 
+#    Resolve kitty's remote-control binary once and pass it to the shim via
+#    KITTY_TMUX_SHIM_BIN (kitty_bin() checks it first), so the shim doesn't
+#    re-scan PATH on every tmux call. Only export when one actually resolves --
+#    otherwise leave it unset and let the shim's own discovery (incl. the macOS
+#    app-bundle fallback) handle it.
+if [ -z "${KITTY_TMUX_SHIM_BIN:-}" ]; then
+  _kb="$(command -v kitten || command -v kitty || true)"
+  if [ -z "$_kb" ] && [ -x /Applications/kitty.app/Contents/MacOS/kitten ]; then
+    _kb="/Applications/kitty.app/Contents/MacOS/kitten"
+  fi
+  if [ -n "$_kb" ]; then export KITTY_TMUX_SHIM_BIN="$_kb"; fi
+  unset _kb
+fi
+
 # 2) Agent teams are experimental and off by default.
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 

@@ -86,6 +86,7 @@ if [ "$(uname -s)" = "Darwin" ]; then
 </dict>
 </plist>
 PLISTEOF
+  chmod 600 "$PLIST"
   say "agent    -> $PLIST"
   launchctl bootout   "gui/$(id -u)/$LABEL" 2>/dev/null || true
   launchctl bootstrap "gui/$(id -u)" "$PLIST"

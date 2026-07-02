@@ -37,6 +37,12 @@ except ImportError:  # non-unix; shouldn't happen on macOS
 
 HOME = os.path.expanduser("~")
 SHIM_DIR = os.path.join(HOME, ".claude", "kitty-tmux-shim")
+# Keep everything we create here (the dir, state.json, shim.log) owner-only. One
+# umask call costs nothing per write; it only affects files created after it, so
+# a pre-existing dir/file keeps its mode (acceptable -- ~/.claude is already
+# private). The shim is short-lived and only spawns `kitten @` clients, so a
+# restrictive umask has no wider side effects.
+os.umask(0o077)
 os.makedirs(SHIM_DIR, exist_ok=True)
 LOG = os.path.join(SHIM_DIR, "shim.log")
 STATE = os.path.join(SHIM_DIR, "state.json")
@@ -367,6 +373,8 @@ def cmd_split_window(args):
             target = args[i + 1]; i += 2
         elif a in ("-l", "-p"):
             i += 2  # size: ignore value
+        elif a == "-e":
+            i += 2  # env (VAR=val): value-taking, don't misparse it as the command
         elif a in ("-d", "-P", "-b", "-f", "-I", "-Z"):
             i += 1
         elif a == "--":
@@ -762,8 +770,10 @@ def cmd_display_message(args):
     else:
         wid = current_pane_id() or load_state().get("last") or "0"
     sess = session_name(target)
-    if fmt and pflag:
-        print(fmt_resolve(fmt, str(wid), sess=sess))
+    # -p always needs a value back: CC treats empty output as "Failed to get
+    # current pane ID" and aborts. Default the format if one wasn't supplied.
+    if pflag:
+        print(fmt_resolve(fmt or "#{pane_id}", str(wid), sess=sess))
 
 
 HANDLERS = {
