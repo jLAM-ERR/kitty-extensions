@@ -23,6 +23,7 @@ Limitations (kitty cannot reconstruct these from a session file):
 import glob
 import json
 import os
+import re
 import shlex
 import subprocess
 import shutil
@@ -54,6 +55,20 @@ RESOLVE_PATH = os.pathsep.join([
     "/usr/local/bin",
     os.environ.get("PATH", "/usr/bin:/bin:/usr/sbin:/sbin"),
 ])
+
+
+# kitty parses the session file line-by-line (str.splitlines), which breaks lines
+# on more than just \n: also \r, \v, \f, \x1c-\x1e, NEL and LS/PS. Any of those
+# embedded in a title/path/arg we write would start a NEW session directive ->
+# arbitrary `launch` executed on the next kitty restart. A tab title is fully
+# program-controlled (OSC title escape), so this is untrusted input. shlex.quote
+# does NOT stop it (splitlines runs on the raw bytes, before any unquoting), so
+# collapse every C0 control, DEL, NEL and LS/PS to a space at the source.
+_UNSAFE = re.compile(r"[\x00-\x1f\x7f\x85\u2028\u2029]")
+
+
+def one_line(s):
+    return _UNSAFE.sub(" ", s or "")
 
 
 def sockets():
@@ -149,7 +164,7 @@ def render(os_windows):
         if oi > 0:
             out.append("new_os_window")
         for ti, tab in enumerate(osw.get("tabs") or []):
-            title = (tab.get("title") or "").strip().replace("\n", " ")
+            title = one_line(tab.get("title")).strip()
             # The tab title is the argument to `new_tab` (kitty stores it as the
             # sticky Tab.name). A leading `new_tab` does NOT create a spurious
             # empty tab -- verified for both the first tab and the first tab after
@@ -164,10 +179,10 @@ def render(os_windows):
             for wi, w in enumerate(wins):
                 cmd, cwd = primary_process(w)
                 cmd = resolve_launch(cmd)
-                parts = ["launch", "--cwd", shlex.quote(cwd)]
+                parts = ["launch", "--cwd", shlex.quote(one_line(cwd))]
                 if cmd:
                     parts.append("--")
-                    parts.extend(shlex.quote(a) for a in cmd)
+                    parts.extend(shlex.quote(one_line(a)) for a in cmd)
                 out.append(" ".join(parts))
                 if w.get("is_focused") or w.get("is_active"):
                     focus_after = len(out)

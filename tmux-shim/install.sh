@@ -20,6 +20,7 @@ section(){ printf '\n==> %s\n' "$*"; }
 # --------------------------------------------------------------------------- #
 section "Claude Code <- tmux shim"
 mkdir -p "$SHIM_DIR/bin"
+chmod 700 "$SHIM_DIR"                              # state.json / shim.log stay private
 install -m 755 "$REPO/tmux" "$SHIM_DIR/bin/tmux"
 say "shim     -> $SHIM_DIR/bin/tmux"
 mkdir -p "$BIN_DIR"
