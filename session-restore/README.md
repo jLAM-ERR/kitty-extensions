@@ -8,6 +8,11 @@ built-in auto-save; this snapshots the live layout into a session file that
 These files are **source copies**, like the rest of this repo. Editing them here
 does nothing until you install them to the paths below.
 
+**Easy install:** from the repo root run `./install.sh session-restore` (or this
+module's installer directly, `./session-restore/install.sh`) — it copies the
+script, adds the kitty.conf lines, and loads the LaunchAgent, idempotently, with
+a kitty.conf backup. The manual steps are below if you prefer.
+
 ## Pieces
 
 | Repo file | Installed to | Role |
